@@ -1,0 +1,35 @@
+This stereo hand pose benchmark is described in the paper
+3D Hand Pose Tracking and Estimation Using a Stereo Camera
+
+Our stereo hand pose benchmark contains sequences with 6 different backgrounds and every background has two sequences with counting and random poses. Every sequence has 1500 frames, so there are totally 18000 frames in our benchmark.
+Stereo and depth images were captured from a Point Grey Bumblebee2 stereo camera and an Intel Real Sense F200 active depth camera simultaneously.
+
+1. Camera parameters
+(1) Point Grey Bumblebee2 stereo camera:
+base line = 120.054
+fx = 822.79041
+fy = 822.79041
+tx = 318.47345
+ty = 250.31296
+(2) Intel Real Sense F200 active depth camera:
+fx color = 607.92271
+fy color = 607.88192
+tx color = 314.78337
+ty color = 236.42484
+fx depth = 475.62768
+fy depth = 474.77709
+tx depth = 336.41179
+ty depth = 238.77962
+rotation vector = [0.00531   -0.01196  0.00301] (use Rodrigues' rotation formula to transform it into rotation matrix)
+translation vector = [-24.0381   -0.4563   -1.2326]
+(rotation and translation vector can transform the coordinates relative to color camera to those relative to depth camera)
+
+2. images
+All the images are in folder '.\images\' which contains 12 subfolders. The left/right images for Point Grey Bumblebee2 stereo camera and color/depth images for Intel Real Sense F200 active depth camera have prefix BB_left_, BB_right_, SK_color_ and SK_depth_ respectively.
+Since the value of depth is usually larger than 255, we use 3 channels to store depth images and depth = r channel + g channel*256.
+
+3. labels
+All the labels are in folder '.\labels\'. The labels for Point Grey Bumblebee2 stereo camera and color/depth images for Intel Real Sense F200 active depth camera have suffix _BB and _SK respectively. For each mat file in this folder, it contains an array named 'handPara' with size 3*21*1500 which stores the 3D positions (x,y,z) in Millimeter of palm center and finger joints (totally 21 joints) of all 1500 the images in this sequence.
+The sequence of 21 joints are: palm center(not wrist or hand center), little_mcp, little_pip, little_dip, little_tip, ring_mcp, ring_pip, ring_dip, ring_tip, middle_mcp, middle_pip, middle_dip, middle_tip, index_mcp, index_pip, index_dip, index_tip, thumb_mcp, thumb_pip, thumb_dip, thumb_tip.
+
+If you have any questions, please send email to zhjw1988@gmail.com

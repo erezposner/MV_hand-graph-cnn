@@ -92,6 +92,14 @@ class ShapePoseNetwork(nn.Module):
         est_mesh_uvd = est_mesh_uvd * self.graph_mask.unsqueeze(0).expand_as(est_mesh_uvd)  # B x V x 3
         # 2.2 convert to mesh xyz in camera coordiante system
         est_mesh_cam_xyz = uvd2xyz(est_mesh_uvd, cam_param, bbox, root_depth, pose_scale)  # B x V x 3
+
+        ##
+        # import trimesh
+        # faces = self.hand_tri.astype('uint32')
+        # d = est_mesh_cam_xyz[0, self.graph_perm_reverse[:self.hand_tri.max() + 1], :]
+        # mesh = trimesh.Trimesh(vertices=d, faces=faces)
+        # mesh.show()
+        ##
         est_mesh_cam_xyz = est_mesh_cam_xyz * self.graph_mask.unsqueeze(0).expand_as(est_mesh_cam_xyz)  # B x V x 3
 
         # 3. Pose estimation

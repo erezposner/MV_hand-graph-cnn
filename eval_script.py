@@ -53,7 +53,7 @@ def main():
     device = cfg.MODEL.DEVICE
     model.to(device)
     model.load_model(cfg)
-
+    faces = model.hand_tri.astype('uint32')
     mesh_renderer = renderer.MeshRenderer(model.hand_tri.astype('uint32'))
 
     # 2. Load data
@@ -63,6 +63,14 @@ def main():
         batch_size=cfg.MODEL.BATCH_SIZE,
         num_workers=cfg.MODEL.NUM_WORKERS
     )
+    #try adding skeleton detection
+    import os,sys
+    lib_path = os.path.abspath(os.path.join('..', 'HandKeyPointDetector'))
+    sys.path.append(lib_path)
+    from HandKeypointDetector import HandKeypointDetector
+    hd = HandKeypointDetector('\output')
+    count = 0
+
 
     # 3. Inference
     model.eval()
@@ -71,12 +79,46 @@ def main():
     logger.info("Evaluate on {} frames:".format(len(dataset_val)))
     for i, batch in enumerate(data_loader_val):
         images, cam_params, bboxes, pose_roots, pose_scales, image_ids = batch
+        new_images = torch.zeros([images.shape[0],256,256,images.shape[3]], dtype=images.dtype)
+        import time
+        cur = time.time()
+        if images[0].shape[0] > 256 and images[0].shape[1] > 256:
+
+            for j in range(len(images)):
+                    bb = hd.detectKeyPoints(images[j])
+                    Ydif = bb['maxY'] - bb['minY']
+                    Xdif = bb['maxX'] - bb['minX']
+                    if (Xdif > Ydif):
+                        bb['maxY'] += abs(Ydif - Xdif)//2
+                        bb['minY'] -= abs(Ydif - Xdif) // 2
+
+                    else:
+                        bb['maxX'] += abs(Ydif - Xdif)//2
+                        bb['minX'] -= abs(Ydif - Xdif) // 2
+                    t_img = images[j][bb['minY']:bb['maxY'],bb['minX']:bb['maxX'], :]
+                    # import matplotlib.pyplot as plt
+                    # plt.close('all')
+                    # plt.imshow(t_img.detach().cpu().numpy())
+                    # plt.savefig('a.png')
+                    import torch.nn.functional as F
+                    downsampled = F.upsample(t_img.float().unsqueeze(0).permute(0, 3, 1, 2), size=(256, 256),
+                                             mode='bilinear').permute(0, 2, 3, 1).byte()
+                    new_images[j] = downsampled[0]
+                    import matplotlib.pyplot as plt
+
+                    plt.imshow(downsampled.squeeze().detach().cpu().numpy())
+                    plt.savefig('output\{}.png'.format(j))
+
+            images = new_images
+
         images, cam_params, bboxes, pose_roots, pose_scales = \
             images.to(device), cam_params.to(device), bboxes.to(device), pose_roots.to(device), pose_scales.to(device)
         with torch.no_grad():
+
             est_mesh_cam_xyz, est_pose_uv, est_pose_cam_xyz = \
                 model(images, cam_params, bboxes, pose_roots, pose_scales)
-
+            elpased = (time.time() - cur) / data_loader_val.batch_size
+            print('average run time per frame = {:.03f}sec'.format(elpased))
             est_mesh_cam_xyz = [o.to(cpu_device) for o in est_mesh_cam_xyz]
             est_pose_uv = [o.to(cpu_device) for o in est_pose_uv]
             est_pose_cam_xyz = [o.to(cpu_device) for o in est_pose_cam_xyz]
@@ -94,9 +136,26 @@ def main():
             if cfg.EVAL.SAVE_BATCH_IMAGES_PRED:
                 file_name = '{}_{}.jpg'.format(osp.join(output_dir, 'pred'), i)
                 logger.info("Saving image: {}".format(file_name))
-                save_batch_image_with_mesh_joints(mesh_renderer, images.to(cpu_device), cam_params.to(cpu_device),
-                                                  bboxes.to(cpu_device), est_mesh_cam_xyz, est_pose_uv,
-                                                  est_pose_cam_xyz, file_name)
+                # test
+                import numpy as np
+                import trimesh
+
+                # attach to logger so trimesh messages will be printed to console
+                trimesh.util.attach_to_log()
+                for j in range(len(images)):
+
+                    # mesh objects can be created from existing faces and vertex data
+                    ind = j
+                    import matplotlib.pyplot as plt
+                    plt.close('all')
+                    plt.imshow(images[ind].detach().cpu().numpy()[...,::-1])
+                    plt.savefig('a.png')
+                    mesh = trimesh.Trimesh(vertices=est_mesh_cam_xyz[ind], faces=faces)
+                    mesh.show()
+                # end test
+                # save_batch_image_with_mesh_joints(mesh_renderer, images.to(cpu_device), cam_params.to(cpu_device),
+                #                                   bboxes.to(cpu_device), est_mesh_cam_xyz, est_pose_uv,
+                #                                   est_pose_cam_xyz, file_name)
 
     # overall evaluate pose estimation
     assert len(results_pose_cam_xyz) == len(dataset_val), \
